@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <radialGradient id="spiralShine" cx="35%" cy="35%">
+      <stop offset="0%" style="stop-color:white;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:white;stop-opacity:0.95" />
+      <stop offset="100%" style="stop-color:#f5f5f5;stop-opacity:0.85" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Main Spiral D Logo -->
+  <g transform="translate(100, 100)" filter="url(#glow)">
+    <!-- Left vertical stroke - main spine -->
+    <path d="M -30,-50 L -30,50 Q -30,65 -15,65 Q 25,65 40,35 Q 50,10 40,-20 Q 25,-50 -15,-50 Z" 
+          fill="url(#spiralShine)" stroke="white" stroke-width="0.5" stroke-linejoin="round"/>
+    
+    <!-- Inner curve cutout for D shape -->
+    <path d="M -15,-35 L -15,50 Q -15,55 -8,55 Q 15,55 25,30 Q 32,8 25,-15 Q 15,-40 -8,-40 Z" 
+          fill="none" stroke="white" stroke-width="1" opacity="0"/>
+    
+    <!-- Top outer arc - brightest -->
+    <path d="M -28,-45 Q -40,-45 -50,-30 Q -58,-12 -52,8" 
+          fill="white" opacity="0.92" stroke="none"/>
+    
+    <!-- Upper right arc -->
+    <path d="M -5,-52 Q 15,-58 35,-45 Q 48,-32 50,-8" 
+          fill="white" opacity="0.88" stroke="none"/>
+    
+    <!-- Right side flowing curve -->
+    <path d="M 50,-8 Q 52,18 42,40 Q 28,58 5,62" 
+          fill="white" opacity="0.84" stroke="none"/>
+    
+    <!-- Bottom flowing arc -->
+    <path d="M 5,62 Q -18,65 -38,50 Q -52,38 -52,8" 
+          fill="white" opacity="0.80" stroke="none"/>
+    
+    <!-- Inner highlight - left side -->
+    <path d="M -18,-32 Q -25,-30 -28,-18 Q -30,0 -25,28 Q -18,48 -8,52" 
+          fill="white" opacity="0.75" stroke="none"/>
+    
+    <!-- Inner center flow -->
+    <path d="M -8,52 Q 5,55 18,42 Q 28,28 30,5 Q 28,-20 15,-38 Q 5,-48 -5,-50" 
+          fill="white" opacity="0.70" stroke="none"/>
+    
+    <!-- Top accent shine -->
+    <ellipse cx="-15" cy="-42" rx="14" ry="18" fill="white" opacity="0.68"/>
+    
+    <!-- Center core light -->
+    <ellipse cx="0" cy="5" rx="10" ry="14" fill="white" opacity="0.62"/>
+    
+    <!-- Subtle highlight top -->
+    <path d="M -20,-38 Q -12,-42 -8,-38 Q -10,-33 -18,-35 Z" 
+          fill="white" opacity="0.55"/>
+  </g>
+</svg>
