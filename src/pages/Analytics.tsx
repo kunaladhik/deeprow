@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Line, Bar, Pie, Scatter } from 'react-chartjs-2';
+import { useState, useEffect } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+  import { Bar, Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -11,8 +12,10 @@ import {
   Title,
   Tooltip,
   Legend,
-} from 'chart.js';
-import '../styles/analytics.css';
+} from 'chart.js'
+import { useAnalyticsStore } from '../store/analytics'
+import analyticsAPI, { VisualizationTemplate } from '../utils/api'
+import '../styles/analytics.css'
 
 ChartJS.register(
   CategoryScale,
@@ -24,267 +27,265 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend
-);
+)
 
 export default function Analytics() {
-  const [file, setFile] = useState<File | null>(null);
-  const [data, setData] = useState<any>(null);
-  const [selectedChart, setSelectedChart] = useState('line');
-  const [fileName, setFileName] = useState('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [dataStats, setDataStats] = useState<any>(null);
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const fileId = searchParams.get('file') || ''
+  
+  const { fileId: storedFileId, filename, profile, setAnalysisData } = useAnalyticsStore()
+  const currentFileId = fileId || storedFileId
+  
+  const [templates, setTemplates] = useState<VisualizationTemplate[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedTemplate, setSelectedTemplate] = useState<number>(0)
 
-  const chartTypes = [
-    { id: 'line', name: 'Line Chart', icon: '📈' },
-    { id: 'bar', name: 'Bar Chart', icon: '📊' },
-    { id: 'pie', name: 'Pie Chart', icon: '🥧' },
-    { id: 'scatter', name: 'Scatter Plot', icon: '🔵' },
-    { id: 'area', name: 'Area Chart', icon: '🗻' },
-    { id: 'doughnut', name: 'Doughnut', icon: '🍩' },
-  ];
-
-  // Mock data for demonstration
-  const mockChartData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-    datasets: [
-      {
-        label: 'Data Series 1',
-        data: [65, 59, 80, 81, 56, 55],
-        borderColor: '#6366f1',
-        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-        fill: true,
-        tension: 0.4,
-      },
-      {
-        label: 'Data Series 2',
-        data: [45, 39, 60, 61, 36, 45],
-        borderColor: '#8b5cf6',
-        backgroundColor: 'rgba(139, 92, 246, 0.1)',
-        fill: true,
-        tension: 0.4,
-      },
-    ],
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.currentTarget.classList.add('drag-active');
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.currentTarget.classList.remove('drag-active');
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.currentTarget.classList.remove('drag-active');
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      handleFileSelect(files[0]);
-    }
-  };
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.length) {
-      handleFileSelect(e.target.files[0]);
-    }
-  };
-
-  const handleFileSelect = (selectedFile: File) => {
-    const validTypes = [
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'text/csv',
-    ];
-
-    if (validTypes.includes(selectedFile.type) || selectedFile.name.endsWith('.csv') || selectedFile.name.endsWith('.xlsx')) {
-      setFile(selectedFile);
-      setFileName(selectedFile.name);
-      analyzeFile(selectedFile);
+  // Load data when component mounts
+  useEffect(() => {
+    if (currentFileId) {
+      loadAnalytics()
     } else {
-      alert('Please upload a valid Excel or CSV file');
+      setError('No file selected. Please upload a file first.')
+      setLoading(false)
+      // Redirect to upload page after 2 seconds
+      const timer = setTimeout(() => {
+        navigate('/upload')
+      }, 2000)
+      return () => clearTimeout(timer)
     }
-  };
+  }, [currentFileId, navigate])
 
-  const analyzeFile = (selectedFile: File) => {
-    setIsAnalyzing(true);
-    // Simulate analysis
-    setTimeout(() => {
-      setData(mockChartData);
-      setDataStats({
-        records: 1250,
-        fields: 8,
-        quality: 96,
-        missingValues: 12,
-      });
-      setIsAnalyzing(false);
-    }, 1500);
-  };
+  const loadAnalytics = async () => {
+    setLoading(true)
+    setError(null)
 
-  const renderChart = () => {
-    if (!data) return null;
+    try {
+      if (!currentFileId) return
+      const data = await analyticsAPI.getFullAnalysis(currentFileId)
+      setAnalysisData(data.profile, data.insights, data.templates)
+      setTemplates(data.templates)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to load analytics'
+      setError(msg)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    const commonOptions = {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: {
-        legend: {
-          position: 'top' as const,
+  const renderKPICard = (template: VisualizationTemplate) => {
+    return (
+      <div className="kpi-card">
+        <div className="kpi-label">{template.label}</div>
+        <div className="kpi-value">
+          {typeof template.value === 'number'
+            ? template.value.toLocaleString('en-US', {
+                maximumFractionDigits: 2,
+              })
+            : 'N/A'}
+        </div>
+        {template.unit && <div className="kpi-unit">{template.unit}</div>}
+        {template.trend && (
+          <div className={`kpi-trend ${template.trend}`}>
+            {template.trend === 'up' ? '📈' : template.trend === 'down' ? '📉' : '➡️'}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const renderBarChart = (template: VisualizationTemplate) => {
+    if (!template.data || template.data.length === 0) return null
+
+    const data = {
+      labels: template.data.map((d: any) => d[template.x_axis || 'category']),
+      datasets: [
+        {
+          label: template.y_axis || 'Value',
+          data: template.data.map((d: any) => d[template.y_axis || 'value']),
+          backgroundColor: 'rgba(99, 102, 241, 0.7)',
+          borderColor: 'rgba(99, 102, 241, 1)',
+          borderWidth: 1,
         },
-      },
-    };
-
-    switch (selectedChart) {
-      case 'line':
-        return <Line data={data} options={commonOptions} />;
-      case 'bar':
-        return <Bar data={data} options={commonOptions} />;
-      case 'pie':
-        return <Pie data={mockChartData} options={commonOptions} />;
-      case 'scatter':
-        return <Scatter data={data} options={commonOptions} />;
-      default:
-        return <Line data={data} options={commonOptions} />;
+      ],
     }
-  };
 
-  const handleDownload = (format: 'ppt' | 'pdf') => {
-    alert(`Downloading as ${format.toUpperCase()}...`);
-    // Implementation would call backend API
-  };
+    return <Bar data={data} options={{ responsive: true }} />
+  }
+
+  const renderLineChart = (template: VisualizationTemplate) => {
+    if (!template.data || template.data.length === 0) return null
+
+    const data = {
+      labels: template.data.map((d: any) => d[template.x_axis || 'date']),
+      datasets: [
+        {
+          label: template.y_axis || 'Value',
+          data: template.data.map((d: any) => d[template.y_axis || 'value']),
+          borderColor: 'rgba(139, 92, 246, 1)',
+          backgroundColor: 'rgba(139, 92, 246, 0.1)',
+          tension: 0.4,
+          fill: true,
+        },
+      ],
+    }
+
+    return <Line data={data} options={{ responsive: true }} />
+  }
+
+  const renderHistogram = (template: VisualizationTemplate) => {
+    if (!template.data || template.data.length === 0) return null
+
+    const data = {
+      labels: template.data.map((d: any) => 
+        d.category || `${d.min}-${d.max}`
+      ),
+      datasets: [
+        {
+          label: 'Frequency',
+          data: template.data.map((d: any) => d.count),
+          backgroundColor: 'rgba(34, 197, 94, 0.7)',
+          borderColor: 'rgba(34, 197, 94, 1)',
+          borderWidth: 1,
+        },
+      ],
+    }
+
+    return <Bar data={data} options={{ responsive: true }} />
+  }
+
+  const renderTemplate = (template: VisualizationTemplate) => {
+    switch (template.type) {
+      case 'kpi_card':
+        return renderKPICard(template)
+      case 'bar_chart':
+        return renderBarChart(template)
+      case 'line_chart':
+        return renderLineChart(template)
+      case 'histogram':
+        return renderHistogram(template)
+      default:
+        return <div>Unsupported chart type: {template.type}</div>
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="analytics">
+        <div className="analytics-container">
+          <div className="loading-spinner">
+            <div className="spinner"></div>
+            <p>Analyzing your data...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="analytics">
+        <div className="analytics-container">
+          <div className="error-container">
+            <h2>❌ Error</h2>
+            <p>{error}</p>
+            <button onClick={() => navigate('/upload')}>← Upload Data</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="analytics">
       <div className="analytics-container">
-        {/* Header */}
         <div className="analytics-header">
           <div className="header-info">
-            <h1>Analytics Dashboard</h1>
-            <p>Upload your data and transform it into interactive insights</p>
+            <h1>📊 Analytics Dashboard</h1>
+            {filename && <p>File: {filename}</p>}
           </div>
         </div>
 
-        {!data ? (
-          // Upload Section
-          <div className="upload-section">
-            <div
-              className="drop-zone"
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              <div className="drop-zone-content">
-                <div className="upload-icon">📁</div>
-                <h2>Drop your file here</h2>
-                <p>or</p>
-                <label className="file-input-label">
-                  <span>Choose File</span>
-                  <input type="file" onChange={handleFileInput} accept=".csv,.xlsx,.xls" />
-                </label>
-                <p className="upload-hint">Supports CSV and Excel files</p>
-              </div>
+        {profile && (
+          <div className="data-stats">
+            <div className="stat-card">
+              <div className="stat-label">Rows</div>
+              <div className="stat-value">{profile.row_count.toLocaleString()}</div>
             </div>
-
-            {isAnalyzing && (
-              <div className="analyzing">
-                <div className="spinner"></div>
-                <p>Analyzing your data...</p>
-              </div>
-            )}
-
-            <div className="upload-info">
-              <div className="info-card">
-                <span className="info-icon">✨</span>
-                <h3>Smart Analysis</h3>
-                <p>We automatically detect patterns and generate insights</p>
-              </div>
-              <div className="info-card">
-                <span className="info-icon">📊</span>
-                <h3>Multiple Formats</h3>
-                <p>Choose from 10+ chart types to visualize your data</p>
-              </div>
-              <div className="info-card">
-                <span className="info-icon">⬇️</span>
-                <h3>Easy Sharing</h3>
-                <p>Download as PDF, PowerPoint, or image instantly</p>
-              </div>
+            <div className="stat-card">
+              <div className="stat-label">Columns</div>
+              <div className="stat-value">{profile.column_count}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">KPIs</div>
+              <div className="stat-value">{profile.kpis.length}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Data Types</div>
+              <div className="stat-value">{profile.numeric_columns.length}N {profile.categorical_columns.length}C</div>
             </div>
           </div>
-        ) : (
-          // Analytics Display Section
-          <div className="analytics-display">
-            {/* Data Stats */}
-            <div className="data-stats">
-              <div className="stat-card">
-                <div className="stat-label">Records</div>
-                <div className="stat-value">{dataStats.records.toLocaleString()}</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Fields</div>
-                <div className="stat-value">{dataStats.fields}</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Data Quality</div>
-                <div className="stat-value">{dataStats.quality}%</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Missing Values</div>
-                <div className="stat-value">{dataStats.missingValues}</div>
-              </div>
-            </div>
+        )}
 
-            {/* Chart Type Selector */}
+        {templates.length > 0 && (
+          <div className="analytics-display">
             <div className="chart-selector">
-              <h3>Choose Visualization Type</h3>
+              <h3>Visualizations</h3>
               <div className="chart-buttons">
-                {chartTypes.map((chart) => (
+                {templates.map((template, idx) => (
                   <button
-                    key={chart.id}
-                    className={`chart-btn ${selectedChart === chart.id ? 'active' : ''}`}
-                    onClick={() => setSelectedChart(chart.id)}
+                    key={idx}
+                    className={`chart-btn ${selectedTemplate === idx ? 'active' : ''}`}
+                    onClick={() => setSelectedTemplate(idx)}
                   >
-                    <span className="chart-btn-icon">{chart.icon}</span>
-                    <span className="chart-btn-name">{chart.name}</span>
+                    {template.type === 'kpi_card' && '📈'}
+                    {template.type === 'bar_chart' && '📊'}
+                    {template.type === 'line_chart' && '📉'}
+                    {template.type === 'histogram' && '📊'}
+                    {template.title || template.label || `Chart ${idx + 1}`}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Chart Display */}
             <div className="chart-container">
-              <div className="chart-wrapper">{renderChart()}</div>
-            </div>
-
-            {/* Actions */}
-            <div className="analytics-actions">
-              <div className="action-group">
-                <h3>Download Report</h3>
-                <div className="action-buttons">
-                  <button className="btn-action btn-pdf" onClick={() => handleDownload('pdf')}>
-                    📄 Download as PDF
-                  </button>
-                  <button className="btn-action btn-ppt" onClick={() => handleDownload('ppt')}>
-                    📊 Download as PowerPoint
-                  </button>
-                </div>
+              <div className="chart-wrapper">
+                {templates[selectedTemplate] && renderTemplate(templates[selectedTemplate])}
               </div>
-              <button className="btn-new-analysis" onClick={() => {
-                setData(null);
-                setFile(null);
-                setFileName('');
-                setSelectedChart('line');
-              }}>
-                ➕ New Analysis
-              </button>
-            </div>
-
-            {/* File Info */}
-            <div className="file-info">
-              <p>Current file: <strong>{fileName}</strong></p>
             </div>
           </div>
         )}
+
+        {profile && profile.columns && (
+          <div className="data-overview">
+            <h3>📋 Data Overview</h3>
+            <div className="columns-grid">
+              {profile.columns.slice(0, 8).map((col: ColumnInfo, idx: number) => (
+                <div key={idx} className="column-card">
+                  <div className="column-type">
+                    {col.type === 'numeric' && '🔢'}
+                    {col.type === 'categorical' && '📂'}
+                    {col.type === 'date' && '📅'}
+                    {col.type === 'text' && '📝'}
+                  </div>
+                  <div className="column-name">{col.name}</div>
+                  <div className="column-stats">
+                    <small>{col.type}</small>
+                  </div>
+                  {col.is_kpi && <div className="kpi-badge">KPI</div>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="analytics-actions">
+          <button className="btn-new-analysis" onClick={() => navigate('/upload')}>
+            ➕ New Analysis
+          </button>
+        </div>
       </div>
     </div>
-  );
+  )
 }

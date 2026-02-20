@@ -294,4 +294,223 @@ Zustand Store Structure:
 
 ---
 
+## 🐍 Backend Architecture (Python FastAPI)
+
+### Backend Structure
+```
+backend/
+├── main.py                 # FastAPI server
+├── requirements.txt        # Python dependencies
+├── .gitignore
+│
+└── analytics/              # Core analytics modules
+    ├── __init__.py
+    ├── loader.py           # CSV/Excel file loading
+    ├── profiler.py         # Data type detection & statistics
+    ├── insights.py         # Analytics engine (aggregations, trends)
+    └── templates.py        # Visualization template generation
+```
+
+### Data Processing Pipeline
+
+```
+CSV/Excel File (HTTP Upload)
+    ↓
+    └──→ loader.py
+         ├── Read file (CSV or Excel)
+         └── Convert to pandas.DataFrame
+    ↓
+    └──→ profiler.py
+         ├── Detect column types (numeric, categorical, date, text)
+         ├── Identify KPIs (sales, revenue, quantity, etc.)
+         ├── Calculate statistics (min, max, mean, median, std)
+         └── Return: {columns, stats, kpis, types}
+    ↓
+    └──→ insights.py
+         ├── Generate aggregations (sum, count, average)
+         ├── Detect trends (time-series)
+         ├── Create distributions (histograms)
+         └── Return: {summary, trends, distributions}
+    ↓
+    └──→ templates.py
+         ├── Auto-generate KPI cards
+         ├── Create bar charts
+         ├── Create line charts
+         ├── Create pie charts
+         └── Return: [{type, data, title}, ...]
+    ↓
+Store in Memory (uploaded_data dict)
+    ↓
+Return to Frontend (JSON)
+    ├── file_id
+    ├── profile
+    ├── insights
+    └── templates
+```
+
+### API Endpoints
+
+```
+POST  /upload              - Upload CSV/Excel file
+GET   /profile/{file_id}   - Get data profile
+GET   /insights/{file_id}  - Get analytics insights  
+GET   /templates/{file_id} - Get visualization templates
+GET   /full-analysis/{file_id} - Get all above in one call
+GET   /sample-data         - Get demo data for testing
+GET   /docs                - Interactive API documentation
+```
+
+### Technology Stack
+
+**Backend Framework:**
+- FastAPI (modern, fast, easy)
+- Uvicorn (ASGI server)
+
+**Data Processing:**
+- pandas (data loading, analysis)
+- numpy (numerical computing)
+- openpyxl (Excel support)
+
+**Utilities:**
+- python-dateutil (date detection)
+- scikit-learn (statistics)
+
+### State Management (Backend)
+
+```
+uploaded_data = {
+    'file_0': {
+        'df': pandas.DataFrame,
+        'filename': 'sales.csv',
+        'profile': {
+            'shape': (1000, 5),
+            'columns': [...],
+            'kpis': ['revenue', 'sales'],
+            ...
+        }
+    },
+    'file_1': { ... },
+    ...
+}
+```
+
+---
+
+## 🔌 Full Stack Integration
+
+```
+┌──────────────────────────────────────────────────────────┐
+│              React Frontend                              │
+│          (Port 5173 - Vite Dev Server)                  │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│  FileUpload.tsx ←→ API Client ←→ Zustand Store         │
+│                                                          │
+│  Analytics.tsx  ←→ Chart Display ←→ Data Profiles      │
+│                                                          │
+└──────────────────────┬───────────────────────────────────┘
+                       │ HTTP/REST
+                       │ (JSON)
+                       ▼
+┌──────────────────────────────────────────────────────────┐
+│             FastAPI Backend                             │
+│          (Port 8000 - Uvicorn Server)                   │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│  /upload  ←→  loader.py  ←→  profiler.py              │
+│                                ↓                         │
+│  /full-analysis ←→ insights.py ←→ templates.py         │
+│                                                          │
+│  In-Memory Storage: uploaded_data = {file: {...}}      │
+│                                                          │
+└──────────────────────────────────────────────────────────┘
+```
+
+### Request/Response Example
+
+**Upload Request:**
+```
+POST /upload HTTP/1.1
+Content-Type: multipart/form-data
+
+[CSV file content]
+```
+
+**Upload Response:**
+```json
+{
+  "success": true,
+  "file_id": "file_0",
+  "filename": "sales_data.csv",
+  "profile": {
+    "shape": [100, 5],
+    "row_count": 100,
+    "column_count": 5,
+    "columns": [
+      {
+        "name": "date",
+        "type": "date",
+        "is_kpi": false,
+        "unique_count": 100
+      },
+      {
+        "name": "revenue",
+        "type": "numeric",
+        "is_kpi": true,
+        "min": 100,
+        "max": 5000,
+        "mean": 2500
+      }
+    ],
+    "kpis": ["revenue"]
+  }
+}
+```
+
+**Analytics Request:**
+```
+GET /full-analysis/file_0 HTTP/1.1
+```
+
+**Analytics Response:**
+```json
+{
+  "profile": { ... },
+  "insights": {
+    "aggregations": {
+      "summary": {
+        "revenue": {
+          "sum": 250000,
+          "count": 100,
+          "average": 2500,
+          "min": 100,
+          "max": 5000
+        }
+      }
+    },
+    "trends": { ... },
+    "distributions": { ... }
+  },
+  "templates": [
+    {
+      "type": "kpi_card",
+      "label": "Total Revenue",
+      "value": 250000,
+      "unit": "$"
+    },
+    {
+      "type": "line_chart",
+      "title": "Revenue Over Time",
+      "x_axis": "date",
+      "y_axis": "revenue",
+      "data": [...]
+    },
+    ...
+  ]
+}
+```
+
+---
+
 **All components are production-ready and can be extended with real data!** 🚀
+

@@ -20,6 +20,10 @@ export default function Layout() {
         </div>
         
         <nav className="nav-menu">
+          <Link to="/upload" className="nav-link">
+            <span className="icon">📤</span>
+            <span>Upload Data</span>
+          </Link>
           <Link to="/analytics" className="nav-link">
             <span className="icon">📊</span>
             <span>Analytics</span>
@@ -27,7 +31,7 @@ export default function Layout() {
         </nav>
 
         <div className="sidebar-footer">
-          <button className="logout-btn" onClick={() => navigate('/login')}>🚪 Logout</button>
+          <button className="logout-btn" onClick={() => { localStorage.removeItem('token'); navigate('/login'); }}>🚪 Logout</button>
         </div>
       </aside>
 
